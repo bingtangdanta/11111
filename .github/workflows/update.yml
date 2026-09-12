@@ -27,6 +27,7 @@ jobs:
       - name: Run update script
         env:
           HITHINK_FINANCE_API_KEY: ${{ secrets.HITHINK_FINANCE_API_KEY }}
+          ASHARE_SNAPSHOT_ORDER: "tencent,em"
         run: |
           python scripts/fetch_data.py
 
