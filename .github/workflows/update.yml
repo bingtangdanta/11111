@@ -28,7 +28,7 @@ jobs:
         env:
           HITHINK_FINANCE_API_KEY: ${{ secrets.HITHINK_FINANCE_API_KEY }}
         run: |
-          python scripts/regime.py
+          python scripts/fetch_data.py
 
       - name: Commit and push changes
         run: |
