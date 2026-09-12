@@ -1,0 +1,740 @@
+/* ============================================================
+   量化猎人 · 暗黑 Bento 布局（纯 CSS，无任何图片素材）
+   本次修正（用户反馈）：
+     ① 去掉所有滚动条（右侧拖动条 + 卡片内部滚动条）—— 保留滚动能力但不可见
+     ② 方块 ↔ 主舞台的切换改为**真正可动画**的结构：
+        .shell 用 flex（导轨宽度可过渡），卡片用 FLIP 动画飞入飞出（见 app.js）
+     ③ 方块模式重排：按模块 id 显式分配栅格跨度，行高统一，不再参差不齐
+     ④ 筹码峰：套牢盘=蓝、获利盘=红，行距极紧（峰与峰之间几乎无空隙）+ 悬停显示价格
+   ============================================================ */
+
+:root{
+  --bg:#0a0a0b;
+  --card:#121214;
+  --card-2:#17171a;
+  --line:#232327;
+  --line-2:#2c2c31;
+  --txt:#f2f2f4;
+  --txt-2:#a8a8b0;
+  --txt-3:#6f6f78;
+  --up:#e64545;          /* A股习惯：涨红 */
+  --down:#20a67a;        /* 跌绿 */
+  --flat:#8e8e93;
+  --blue:#3d7dff;        /* 套牢盘 */
+  --amber:#e8a33d;
+  --purple:#a06ee8;
+  --cyan:#3dc9c0;
+  --r-card:14px;
+  --r-el:8px;
+  --gap:14px;
+  --rail:264px;
+  /* 过渡：借鉴 iOS / MIUI 的手感 —— 长一点、尾巴更缓（不是匀速也不是线性弹） */
+  --ease:cubic-bezier(.22,1,.36,1);
+  --dur:.46s;
+  --dur-fast:.26s;
+  --shadow:0 1px 0 rgba(255,255,255,.02), 0 8px 24px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+
+/* ---------- ① 隐藏所有滚动条（页面右侧拖动条 + 卡片内部），滚动照旧可用 ---------- */
+html,body,*{scrollbar-width:none;-ms-overflow-style:none}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{width:0;height:0;display:none}
+
+body{
+  background:var(--bg);color:var(--txt);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+.muted{color:var(--txt-3);font-size:12px}
+.num{font-variant-numeric:tabular-nums}
+.up{color:var(--up)}
+.down{color:var(--down)}
+.flat{color:var(--flat)}
+
+/* ---------------- 顶部栏 ---------------- */
+.topbar{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:14px 22px;border-bottom:1px solid var(--line);
+  background:#0c0c0e;position:sticky;top:0;z-index:20;
+}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.logo{
+  width:34px;height:34px;flex:none;border-radius:10px;background:var(--up);
+  display:grid;place-items:center;font-size:15px;color:#fff;
+}
+.brand h1{font-size:17px;font-weight:700;letter-spacing:.3px}
+.brand .sub{font-size:11.5px;color:var(--txt-3);margin-top:1px}
+.status{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap}
+
+.badge{
+  display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:6px;
+  font-size:11.5px;font-weight:600;background:var(--card-2);border:1px solid var(--line-2);
+  color:var(--txt-2);white-space:nowrap;
+}
+.b-blue{color:#cfe0ff;background:#152445;border-color:#22406f}
+.b-amber{color:#ffe6bd;background:#3a2c12;border-color:#6a4d1c}
+.b-red{color:#ffd6d6;background:#3a1616;border-color:#6d2626}
+.b-green{color:#c9f3e4;background:#0f2f26;border-color:#1d5b48}
+.b-purple{color:#e6dbff;background:#251a3d;border-color:#432f6e}
+.b-cyan{color:#c9f4f2;background:#0f2f2e;border-color:#1d5b58}
+
+.btn{
+  height:32px;padding:0 14px;border-radius:var(--r-el);
+  background:var(--card-2);border:1px solid var(--line-2);color:var(--txt-2);font-size:12.5px;
+  transition:background var(--dur) var(--ease), color var(--dur) var(--ease),
+             border-color var(--dur) var(--ease), transform .18s var(--ease);
+}
+.btn:hover{background:#1e1e22;color:var(--txt)}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--up);border-color:var(--up);color:#fff;font-weight:600}
+.btn-primary:hover{background:#f05252}
+.btn.on{background:#1e1e22;color:var(--txt);border-color:#3a3a42}
+.btn-mini{height:26px;padding:0 9px;font-size:11.5px;border-radius:6px}
+
+.notice{
+  margin:12px 22px 0;padding:10px 14px;border-radius:var(--r-el);
+  background:#141416;border:1px solid var(--line);color:var(--txt-2);font-size:12px;line-height:1.7;
+}
+.notice b{color:var(--txt)}
+
+/* ---------------- 系统自检横幅（策略衰减/失效、空仓预警） ----------------
+   用户要求："如果系统自我判断当前策略不适合出手，页面顶部要醒目提示"。
+   所以放在提示条之前、按严重程度分三套配色，并且**只提示不下单**。 */
+.syswarn{
+  margin:12px 22px 0;padding:10px 14px;border-radius:var(--r-el);
+  font-size:12.5px;line-height:1.7;border:1px solid;
+}
+.syswarn.info{background:#141c33;border-color:#26365e;color:#cfe0ff}
+.syswarn.warn{background:#2a1f0e;border-color:#5c4520;color:#ffd9a8}
+.syswarn.danger{background:#2a1214;border-color:#6d2626;color:#ffd6d6}
+.syswarn .sw-line + .sw-line{margin-top:4px}
+.syswarn .sw-foot{margin-top:6px;color:var(--txt-3);font-size:11px}
+/* 自检面板里的小工具 */
+.bullets{margin:6px 0 0;padding-left:16px;color:var(--txt-2);font-size:12px;line-height:1.75}
+.bullets li{margin:2px 0}
+.warnbar{padding:8px 11px;border-radius:var(--r-el);margin-top:8px;font-size:12.5px;border:1px solid}
+.warnbar.info{background:#141c33;border-color:#26365e;color:#cfe0ff}
+.warnbar.warn{background:#2a1f0e;border-color:#5c4520;color:#ffd9a8}
+.warnbar.danger{background:#2a1214;border-color:#6d2626;color:#ffd6d6}
+
+/* ---------------- ② 布局外壳：**固定三个界面** ----------------
+   用户要求（原话）：
+     · "一个电脑界面能同时看到三个不同模块的内容"（一屏三块，跟第一版一样）
+     · "竖着的时候三个界面竖着排列"
+     · "单个界面的上下滑行"（每块自己要能上下滚）
+     · "拉三个界面的左右边界…一个模块占用 2/3，只看两个模块"
+     · "在展开界面的时候，不要有上方的模块"
+   所以：
+     · 横屏：三列并排，**每块自己上下滚动**（高度=视口高度，页面不整体滚动）
+     · 竖屏：三块竖着排，每块最多 86vh 自己滚，页面负责在块之间移动
+     · 列宽可拖动（.gutter），拖到很窄就**收起**那一块 → 变成"只看两块 / 一块占 2/3"
+   ------------------------------------------------------------------ */
+.shell{display:flex;align-items:flex-start;padding:var(--gap) 22px 26px}
+
+/* ---------------- 电脑端：三块**更修长、居中、左右留白** ----------------
+   用户反馈："三个模块并排时卡片有点扁、有点宽，左右紧贴屏幕边缘，不够舒展"。
+
+   做法（**全部是 CSS**，不动 JS 的列宽计算）：
+     · `.shell` 左右内边距改用 clamp()：屏幕越宽留白越大（最大 220px），
+       三块自然变窄 —— 因为 JS 是按 `stage.clientWidth` 分配宽度的，
+       容器一窄，每块就跟着窄，不需要改任何脚本。
+     · `.stage` 加 max-width + 居中：超宽屏上不让三块无限变宽。
+     · 卡片之间的缝隙用**透明左右边框 + background-clip:padding-box** 做出来：
+       这样"视觉上有 20px 间距"，但**不改变盒子的实际宽度**（box-sizing:border-box），
+       否则 flex 行总宽会超过容器、第三块会被挤出去（JS 给的宽度是写死的 px）。
+     · 原来那条 1px 边框改成内描边（inset box-shadow），于是四周仍有一圈完整的细线，
+       只是被那 10px 透明边往里推了一点 —— 看起来就是"卡片变小了、间距出来了"。
+     · 顺带把提示条与底部内边距压紧一点，把省下来的高度给卡片（页面依然不整体滚动）。 */
+@media (min-width:1080px){
+  /* 中等宽度桌面（1080~1400）：留白小一点，**优先保证卡片有可用宽度** ——
+     实测 1120px 时如果按宽屏那套留白（11vw），卡片只剩 291px，
+     宽表格会横向溢出（scrollW 261 > clientW 250）。 */
+  .shell{padding:6px clamp(14px, 1.2vw, 24px) 8px}
+  .stage{margin:0 auto}   /* 宽度上限由 sizeStage() 按 9:16 算，写死会打架 */
+  .notice{padding:8px 14px;font-size:11.5px;line-height:1.55}
+  .stage>.mod{
+    border-color:transparent;
+    border-left:10px solid transparent;
+    border-right:10px solid transparent;
+    background-clip:padding-box;
+    box-shadow:var(--shadow), inset 0 0 0 1px var(--line);
+    border-radius:var(--r-card);
+  }
+}
+/* 宽屏（≥1400）：左右留白加足，三块变窄变修长，整体居中 */
+@media (min-width:1400px){
+  .shell{padding:6px clamp(14px, 1.2vw, 24px) 8px}
+}
+/* 顶部模块条：只在"三个界面"状态下出现；放大某个界面时整条隐藏 */
+.modbar.hide{display:none}
+
+.stage{
+  flex:1 1 auto;min-width:0;position:relative;
+  /* ⚠️ 这里从 grid 换成 flex，是因为实测发现 grid 下 `height:100%` 会跟"自动行高"打架：
+     面板被压成 26px（内容被 overflow:hidden 裁掉），结果变成整页在滚、单块反而滚不动。
+     flex 里 flex-basis 就是列宽（px），父容器高度确定 → 每块 height:100% → 块内滚动才可靠。 */
+  display:flex;align-items:stretch;gap:0;
+  height:calc(100vh - 176px);                    /* 横屏：三块占满可视高度 */
+}
+.stage>.mod{
+  flex:0 0 auto;height:100%;min-width:0;
+  animation:cardIn .3s var(--ease);
+}
+/* 放大：一个界面占满整行 */
+.shell.zoom-mode .stage>.mod{flex:1 1 auto;width:100% !important}
+@keyframes cardIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ---------------- 三块 ↔ 一块 的进出场：幽灵卡 ----------------
+   放大某个界面时，另外两块并没有"自己的落地动画"（它们直接从 DOM 里被移走了），
+   所以这里放一张**轻量替身**：只有底色、边框和模块名，占着它原来的格子，
+   然后缩小滑向左边的切换条并淡出 —— 观众看到的是"那两块收进切换器里了"。
+   ⚠️ 不要克隆面板 DOM（表格 + canvas 克隆一次要几十毫秒，直接掉帧）。
+   定位用 fixed（相对视口），尺寸由 JS 按原格子写死，全程只动 transform/opacity。 */
+.zoomghost{
+  position:fixed;z-index:40;pointer-events:none;box-sizing:border-box;
+  background:#141417f2;border:1px solid var(--line-2);border-radius:var(--r-card);
+  overflow:hidden;will-change:transform,opacity;
+}
+.zoomghost .zg-head{
+  padding:9px 12px;font-size:12px;font-weight:700;color:var(--txt-2);
+  border-bottom:1px solid var(--line);white-space:nowrap;
+}
+
+/* 每块自己滚动：纵向 + 横向都滚（宽表格不再需要单独拖动才看得到右边）
+   ⚠️ 这条链上每一层都必须"高度受限"，否则内容会把整块撑高、块内滚动就失效：
+      .mod(100%) → .slotwrap(stretch + min-height:0) → .slotmain(min-height:0) → .body(overflow:auto)
+      早期 .slotwrap 用了 align-items:flex-start（为了左侧模块列表贴顶），
+      结果 slotmain 变成内容高度 → body 长到 5000+px，页面整页滚、单块滚不动（实测抓出来的）。 */
+.mod.slot{height:100%;display:flex;flex-direction:column;overflow:hidden}
+.mod.slot > .slotwrap{display:flex;gap:var(--gap);align-items:stretch;flex:1;min-height:0}
+.mod.slot .slotmain{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0}
+.mod.slot .body{
+  flex:1;min-height:0;overflow-y:auto;overflow-x:auto;
+  overscroll-behavior:contain;                   /* 滚到底不要把整页也带着滚 */
+  scrollbar-width:none;
+}
+/* 离屏的块不参与排版/绘制：滚动与切换更省（大页面最有效的一招） */
+.mod.slot{contain:content}
+
+/* ---------------- 列宽可拖动 + 拖动到很窄就收起（"只看两块 = 1/3 + 2/3"） ---------------- */
+.gutter{
+  position:absolute;top:0;bottom:0;width:16px;margin-left:-8px;z-index:24;
+  cursor:col-resize;display:flex;align-items:center;justify-content:center;
+  touch-action:none;                       /* 触屏上也要能拖 */
+}
+.gutter::before{
+  content:"";width:3px;height:58px;border-radius:3px;background:#2c2c33;
+  transition:background .15s var(--ease), height .15s var(--ease);
+}
+.gutter:hover::before,.gutter.dragging::before{background:var(--up);height:110px}
+.gutter.hidden{display:none}
+/* 拖动列宽时：全局禁选 + 禁掉过渡（否则每帧都在算动画，手感发飘） */
+body.col-dragging{cursor:col-resize;user-select:none}
+body.col-dragging *{transition:none !important;animation:none !important}
+.coltip{
+  position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99;
+  padding:8px 14px;border-radius:10px;background:#141417f2;border:1px solid var(--line-2);
+  color:#fff;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;
+  pointer-events:none;opacity:0;transition:opacity .12s var(--ease);box-shadow:var(--shadow);
+}
+.coltip.show{opacity:1}
+/* 收起后的细条：点一下恢复 */
+.collapsed{
+  position:absolute;top:0;bottom:0;width:22px;z-index:23;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  background:#141417;border:1px solid var(--line);border-radius:10px;color:var(--txt-3);
+  font-size:11px;transition:color .15s var(--ease), border-color .15s var(--ease);
+}
+.collapsed:hover{color:var(--txt);border-color:var(--up)}
+.collapsed .ic{font-size:13px}
+.collapsed .tx{writing-mode:vertical-rl;letter-spacing:1px}
+
+/* ---------------- 切换界面：先出轮廓 → 再出内容 ----------------
+   ⚠️ 早期版本用了 `filter: blur(7px)` 做"虚化"，结果**更卡**了：
+      对大面板做 filter 会强制整块重新栅格化（面板里有表格和 canvas，代价极高）。
+      现在改成只动 opacity/transform（合成层），并保留"先轮廓后内容"的观感。 */
+.slothead{flex-wrap:nowrap}
+.skeleton{display:flex;flex-direction:column;gap:8px;padding:2px 0}
+.skeleton > *{background:linear-gradient(90deg,#1a1a1f 25%,#23232a 37%,#1a1a1f 63%);
+              background-size:400% 100%;border-radius:7px;animation:shimmer 1.25s ease-in-out infinite}
+.skeleton .sk-head{height:26px;width:56%}
+.skeleton .sk-row{display:flex;gap:8px;background:none;animation:none}
+.skeleton .sk-row .sk-cell{height:15px;border-radius:6px;
+              background:linear-gradient(90deg,#1a1a1f 25%,#23232a 37%,#1a1a1f 63%);
+              background-size:400% 100%;animation:shimmer 1.25s ease-in-out infinite}
+.skeleton .sk-cell.w1{flex:0 0 26%}
+.skeleton .sk-cell.w2{flex:1 1 auto}
+.skeleton .sk-cell.w3{flex:0 0 18%}
+.skeleton .sk-chart{height:190px;border-radius:10px}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:0 0}}
+/* 内容淡入：只动 opacity + 一点点位移，不吃 GPU */
+.mod.slot .body.appeared{animation:contentIn .26s var(--ease)}
+@keyframes contentIn{from{opacity:.35}to{opacity:1}}
+
+/* 面板头部的图标按钮（‹ › 左右看 / ⤢ 放大 / ⠿ 拖动）——永远排得下，不被截断 */
+.slotbtns{display:flex;gap:4px;flex:none;align-items:center}
+.slotpick{flex:1 1 90px;min-width:0}
+.iconbtn{width:26px;padding:0;justify-content:center;font-size:12px}
+.iconbtn.dim{opacity:.35;cursor:default}
+.mod.slot:not(.haspan) .iconbtn[data-pan]{opacity:.35}
+
+/* 宽表格：鼠标按住可左右拖（滚动条依旧隐藏）
+   ⚠️ 必须 user-select:none + -webkit-user-drag:none：
+      否则按下拖动会先被浏览器当成"选中文字/拖拽内容"，pointermove 直接断掉，
+      表现就是"怎么拖都不动"（用户反馈过"不能左右滑动"的根因之一）。 */
+.hpan{
+  position:relative;overflow-x:auto;overflow-y:hidden;cursor:grab;max-width:100%;
+  user-select:none;-webkit-user-select:none;-webkit-user-drag:none;touch-action:pan-x;
+}
+.hpan.grabbing{cursor:grabbing}
+.hpan table{min-width:max-content}
+.hpan::after{
+  content:"↔ 按住左右拖";position:absolute;right:6px;top:-15px;font-size:10px;
+  color:var(--txt-3);pointer-events:none;opacity:.7;
+}
+.mod.slot.haspan .hpan::after{content:"↔ 可左右拖 / 点头部 ‹ ›"}
+
+/* 历史股评卡片 */
+.rvcard{border:1px solid var(--line);border-radius:var(--r-card);padding:12px 14px;margin-top:10px;
+        background:var(--card-2)}
+.rvhead{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12.5px;margin-bottom:8px}
+.rvstat{font-size:12px;color:var(--txt-3)}
+.rvstat b{font-variant-numeric:tabular-nums}
+
+/* 板块行情顶部的"龙头股汇总"（各板块涨幅第一） */
+.leadgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:8px;margin-top:6px}
+.leadcard{
+  border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--card-2);
+  cursor:pointer;transition:border-color var(--dur-fast) var(--ease), transform .16s var(--ease);
+}
+.leadcard:hover{border-color:var(--up);transform:translateY(-1px)}
+.leadcard .l1{font-size:12.5px;color:var(--txt);display:flex;gap:6px;align-items:baseline;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.leadcard .l1 b{font-weight:700}
+.leadcard .l1 span{margin-left:auto;font-variant-numeric:tabular-nums}
+.leadcard .l2{font-size:11px;color:var(--txt-3);margin-top:3px;white-space:nowrap;
+              overflow:hidden;text-overflow:ellipsis}
+
+/* ---------------- 单一界面（放大）时，模块选择器在**左侧** ----------------
+   用户要求：三个界面时选择器在上方；放大成单一界面时选择器到左侧，
+   并且两者之间要有"上方 ↔ 左侧"的过渡动画（位移由 FLIP 负责，见 playPickFlip）。 */
+.slotwrap{display:flex;gap:var(--gap);align-items:flex-start}
+.slotwrap.haslist .slotmain{flex:1 1 auto;min-width:0}
+.picklist{
+  flex:0 0 172px;display:flex;flex-direction:column;gap:4px;
+  align-self:flex-start;      /* 只让自己贴顶：别把整条高度链改成 flex-start（会破坏块内滚动） */
+  position:sticky;top:76px;
+}
+.picklist .picktitle{font-size:11px;color:var(--txt-3);padding:2px 4px 6px}
+.picklist .pickitem{
+  display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:var(--r-el);
+  background:var(--card);border:1px solid var(--line);color:var(--txt-2);
+  font-size:12.5px;cursor:pointer;white-space:nowrap;
+  transition:background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease),
+             border-color var(--dur-fast) var(--ease), transform .18s var(--ease);
+}
+.picklist .pickitem .ic{font-size:13px;color:var(--txt-3)}
+.picklist .pickitem:hover{background:var(--card-2);color:var(--txt)}
+.picklist .pickitem.on{border-color:var(--up);color:#fff;background:#1a1416}
+.picklist .pickitem.on .ic{color:#fff}
+.picklist .pickitem:active{transform:scale(.97)}
+.zoomhead{align-items:center}
+.zoomhead .zoomtitle{font-size:14px;font-weight:700;color:var(--txt);white-space:nowrap;
+                     overflow:hidden;text-overflow:ellipsis}
+
+/* 拖动时的"跟手幽灵"（模块 → 界面；界面 ⠿ → 互换）
+   只动 transform + opacity，是合成层动画，所以能和左右拖边界一样丝滑。 */
+.dragghost{
+  position:fixed;left:0;top:0;z-index:99;pointer-events:none;
+  padding:7px 12px;border-radius:10px;background:#1c1c22f2;border:1px solid var(--line-2);
+  color:var(--txt);font-size:12.5px;font-weight:700;white-space:nowrap;
+  box-shadow:var(--shadow);opacity:0;transition:opacity .12s var(--ease);
+  will-change:transform;
+}
+.dragghost.show{opacity:1}
+.dragghost::after{
+  content:attr(data-hint);display:block;margin-top:3px;font-size:11px;font-weight:400;
+  color:#ffb9b9;
+}
+body.chip-dragging{cursor:grabbing;user-select:none}
+body.chip-dragging *{transition:none !important}
+/* 目标界面高亮：只画一圈内阴影（不铺大面积底色，避免每帧重绘整块） */
+.mod.slot.droptarget{border-color:var(--up);box-shadow:0 0 0 2px rgba(230,69,69,.55) inset}
+.dragslot{
+  display:inline-flex;align-items:center;justify-content:center;width:24px;height:22px;
+  border-radius:6px;border:1px solid var(--line);color:var(--txt-3);cursor:grab;
+  font-size:12px;line-height:1;user-select:none;
+  transition:color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.dragslot:hover{color:var(--txt);border-color:var(--line-2)}
+.mod.slot.dragging{opacity:.45;transform:scale(.99)}
+.mod.slot.droptarget{border-color:var(--up);box-shadow:0 0 0 2px rgba(230,69,69,.35) inset}
+
+/* ---------------- 筛选表工具条（全市场 5000 行筛选） ----------------
+   用户要求"5000 家都要能筛到"，所以表格必须配：表内搜索 + 快捷筛选 + 行业 + 涨跌幅 +
+   分页（一次只插 80 行 DOM，避免一次插 5000 个节点把页面卡死）。 */
+.screentools{display:flex;flex-direction:column;gap:8px;margin:10px 0 8px}
+.screentools .chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+input.mini,select.mini{
+  height:28px;padding:0 8px;border-radius:8px;background:var(--card-2);
+  border:1px solid var(--line-2);color:var(--txt);font:12px inherit;outline:none;
+}
+input.mini{min-width:150px}
+input.mini:focus,select.mini:focus{border-color:var(--blue)}
+.chip{
+  height:26px;padding:0 10px;border-radius:999px;background:var(--card-2);
+  border:1px solid var(--line);color:var(--txt-2);font-size:12px;cursor:pointer;
+  transition:background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease),
+             border-color var(--dur-fast) var(--ease);
+}
+.chip:hover{color:var(--txt);border-color:var(--line-2)}
+.chip.on{background:#1d1416;border-color:var(--up);color:#fff}
+.screenfoot{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px}
+.screenfoot .btn{flex:none}
+th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+th.sortable:hover{color:var(--txt)}
+tr.top-pick{background:rgba(230,69,69,.06)}
+
+/* ---------------- 宽表格左右拖动（龙虎榜 8 列装不下） ----------------
+   滚动条依然全局隐藏，但可以：触控板横向滑 / 触屏滑 / 鼠标按住拖。 */
+/* 宽表格的旧定义已合并到上面的 .hpan（保留这一行只是为了提醒不要重复定义） */
+
+/* 光标处指标浮层（跟着鼠标显示当前子图的数值） */
+.chart-wrap{position:relative}
+.ktip{
+  position:absolute;left:0;top:0;z-index:6;pointer-events:none;opacity:0;
+  transition:opacity .14s var(--ease);
+  background:#141417ee;border:1px solid var(--line-2);border-radius:8px;padding:7px 9px;
+  font-size:11px;line-height:1.55;white-space:nowrap;box-shadow:var(--shadow);
+  font-variant-numeric:tabular-nums;min-width:118px;
+  /* 用 transform 移动（合成层），比每次改 left/top 触发布局便宜得多 —— 悬停才不掉帧 */
+  will-change:transform;
+}
+.ktip.show{opacity:1}
+.ktip .tt{color:var(--txt-3);margin-bottom:3px}
+.ktip .tr{display:flex;justify-content:space-between;gap:12px}
+.ktip .tr span{color:var(--txt-3)}
+.ktip .tr b{color:var(--txt)}
+
+/* 界面头部：模块下拉（换这一块显示什么）+ 放大/还原 */
+.slothead{
+  display:flex;align-items:center;gap:8px;margin-bottom:8px;
+  padding-bottom:8px;border-bottom:1px solid var(--line);
+}
+.slothead .tag{flex:none}
+.slotpick{
+  flex:1 1 auto;min-width:0;height:28px;padding:0 8px;border-radius:var(--r-el);
+  background:var(--card-2);border:1px solid var(--line-2);color:var(--txt);
+  font:12.5px inherit;outline:none;cursor:pointer;
+}
+.slotpick:focus{border-color:var(--blue)}
+.slotbtns{display:flex;gap:6px;flex:none}
+/* 板块名 / 龙头股：可点的链接样式 */
+.boardlink{color:var(--txt);border-bottom:1px dashed var(--line-2);cursor:pointer}
+.boardlink:hover{color:#fff;border-bottom-color:var(--up)}
+.leadchip{
+  display:inline-flex;align-items:center;gap:4px;margin:2px 6px 2px 0;padding:1px 7px;
+  border-radius:999px;background:var(--card-2);border:1px solid var(--line);
+  font-size:11px;color:var(--txt-2);cursor:pointer;white-space:nowrap;
+  transition:background .16s var(--ease), border-color .16s var(--ease);
+}
+.leadchip:hover{background:#1c1c20;border-color:var(--line-2);color:var(--txt)}
+.leadchip b{font-weight:700}
+.modchip .pin{
+  display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
+  border-radius:50%;background:var(--up);color:#fff;font-size:10px;font-weight:700;
+}
+
+/* ---------------- 拖动顶部模块 → 三列投放条（替换左/中/右那一列） ----------------
+   仅横屏网格模式出现；拖动时浮出，松手即消失。z-index 压住卡片但保留圆角缝隙感。 */
+.colslots{
+  position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:var(--gap);pointer-events:none;opacity:0;transition:opacity .18s var(--ease);z-index:20;
+}
+.colslots.show{opacity:1;pointer-events:auto}
+/* 竖屏是三块竖着排，投放条也跟着变成三行 */
+.colslots.stacked{grid-template-columns:1fr}
+.colslot{
+  display:flex;align-items:flex-start;justify-content:center;padding-top:12px;
+  border:2px dashed rgba(230,69,69,.45);border-radius:var(--r-card);
+  background:rgba(230,69,69,.05);color:#ffb9b9;font-size:12.5px;font-weight:700;
+  transition:background .16s var(--ease), border-color .16s var(--ease), color .16s var(--ease);
+}
+.colslot span{background:#141416;border:1px solid var(--line-2);border-radius:999px;padding:3px 10px}
+.colslot.hot{background:rgba(230,69,69,.16);border-color:var(--up);color:#fff}
+.colslot.hot span{background:#3a1616;border-color:var(--up)}
+
+/* ---------------- 界面卡片 ----------------
+   ⚠️ 这里**故意不给 will-change:transform**：三块大面板各占一个合成层，
+      内容又多（表格 + canvas），白白吃显存还会拖慢重绘 —— 之前"越改越卡"的原因之一。
+      只有小元素（光标浮层）才值得 will-change。 */
+.mod{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);
+  padding:16px 18px 18px;box-shadow:var(--shadow);
+  position:relative;overflow:hidden;display:flex;flex-direction:column;
+  transition:border-color var(--dur-fast) var(--ease);
+}
+.mod:hover{border-color:var(--line-2)}
+.mod .hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.mod .tag{
+  display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:6px;
+  font-size:10.5px;font-weight:700;letter-spacing:.2px;
+}
+.mod h3{font-size:15.5px;font-weight:700;margin:2px 0 3px}
+.mod .desc{font-size:11.5px;color:var(--txt-3);line-height:1.6}
+.mod .body{margin-top:10px;flex:1;min-width:0}
+.mod .kpi{display:flex;gap:18px;flex-wrap:wrap}
+.mod .kpi div{min-width:64px}
+.mod .kpi .k{font-size:10.5px;color:var(--txt-3)}
+.mod .kpi .v{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.mod .go{position:absolute;right:14px;top:14px;color:var(--txt-3);font-size:12px;
+         transition:transform var(--dur) var(--ease), color var(--dur) var(--ease)}
+.shell.grid-mode .mod:hover .go{transform:translateX(3px);color:var(--txt-2)}
+.shell.focus-mode .stage .mod{cursor:default;box-shadow:none}
+.shell.focus-mode .stage .mod:hover{transform:none}
+.shell.focus-mode .stage .mod .go{display:none}
+
+/* ---------------- 卡片内部元素 ---------------- */
+.kv{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:8px 0;border-top:1px solid var(--line);font-size:12.5px}
+.kv:first-of-type{border-top:none}
+.kv .k{color:var(--txt-3)}
+.kv .v{font-variant-numeric:tabular-nums;text-align:right}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.box{background:var(--card-2);border:1px solid var(--line);border-radius:var(--r-el);padding:10px 12px}
+.box .k{font-size:10.5px;color:var(--txt-3)}
+.box .v{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* 表格：不再用"卡片内滚动区"，让整页自然滚动（滚动条已全局隐藏） */
+.table-wrap{width:100%}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:8px 10px;text-align:right;white-space:nowrap}
+th:first-child,td:first-child,th.l,td.l{text-align:left}
+thead th{
+  color:var(--txt-3);font-weight:600;font-size:11.5px;
+  border-bottom:1px solid var(--line-2);background:var(--card);
+}
+thead th.sortable{cursor:pointer;user-select:none;transition:color var(--dur) var(--ease)}
+thead th.sortable:hover{color:var(--txt)}
+tbody tr{border-bottom:1px solid #1a1a1d;transition:background .18s var(--ease)}
+tbody tr:hover{background:#151518}
+tbody tr.top-pick{background:#191214}
+tbody tr.clickable{cursor:pointer}
+
+/* 图表 */
+.chart-wrap{padding:4px 0 0}
+canvas.kc{width:100%;display:block;height:330px;touch-action:pan-y}
+canvas.kc.tall{height:390px}
+.kinfo{font-size:11.5px;color:var(--txt-2);line-height:1.7;min-height:36px;
+       font-variant-numeric:tabular-nums}
+.kinfo b{color:var(--txt)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--txt-3);margin-top:6px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}
+.note{font-size:11px;color:var(--txt-3);line-height:1.7;margin-top:8px}
+
+/* ---------------- ④ 筹码峰（最终版）
+   · **连续一幅图，不拆开**（中间不插分隔块）；柱长按占比等比
+   · 颜色只表示位置：现价以上=蓝（套牢盘）、现价以下=红（获利盘）
+   · 黄线=现价，紫线=平均筹码：都是**叠加线**，落在图上、不打断分布
+   · 鼠标移动画白色横线 + 浮出该价位筹码（不做行高亮）
+   ------------------------------------------------------------------ */
+.chips-wrap{position:relative;margin-top:12px;padding-top:2px}
+.chip-row{display:flex;align-items:center;gap:8px;height:7px}
+.chip-row + .chip-row{margin-top:1px}
+.chip-row .p{width:48px;flex:none;text-align:right;font-size:9px;color:var(--txt-3);
+             font-variant-numeric:tabular-nums;line-height:7px}
+.chip-row .b{flex:1;height:6px;background:#151518;border-radius:1px;overflow:hidden}
+.chip-row .b > i{display:block;height:100%;width:0;transition:width .35s var(--ease)}
+.chip-row.trapped .b > i{background:var(--blue)}   /* 现价以上 = 套牢盘 → 蓝 */
+.chip-row.profit  .b > i{background:var(--up)}     /* 现价以下 = 获利盘 → 红 */
+.chip-row .m{width:40px;flex:none;font-size:9px;color:var(--txt-3);text-align:right;
+             font-variant-numeric:tabular-nums;line-height:7px}
+/* 叠加线：黄=现价，紫=平均筹码（同一条样式，只换颜色，不打断筹码分布） */
+.chip-line{position:absolute;left:46px;right:40px;height:0;border-top:1px solid var(--amber);
+           opacity:0;pointer-events:none;transition:opacity .2s var(--ease)}
+.chip-line.avg{border-top-style:dashed;border-color:var(--purple)}
+.chip-line.show{opacity:1}
+.chip-line span{position:absolute;right:0;top:-14px;font-size:9.5px;font-weight:700;
+                background:#0f0f11;padding:0 4px;border-radius:3px;white-space:nowrap}
+.chip-line.now span{color:var(--amber)}
+.chip-line.avg span{color:var(--purple);top:2px}
+/* 鼠标白色横线 */
+.chip-hline{position:absolute;left:46px;right:40px;height:1px;background:#ffffff;
+            opacity:0;pointer-events:none;transition:opacity .12s var(--ease);z-index:3}
+.chip-hline.show{opacity:.95}
+.chip-tip{
+  position:absolute;top:0;right:0;transform:translateY(-115%);
+  background:#1c1c20;border:1px solid var(--line-2);border-radius:6px;
+  padding:6px 10px;font-size:11px;color:var(--txt);white-space:nowrap;pointer-events:none;
+  opacity:0;transition:opacity .16s var(--ease);z-index:5;font-variant-numeric:tabular-nums;
+}
+.chip-tip.show{opacity:1}
+.chip-tip b{color:#fff}
+.chip-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:10.5px;color:var(--txt-3);margin:8px 0 2px}
+.chip-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}
+
+/* ---------------- 顶部模块条：全部模块列出来，可点击、可拖拽排序 ---------------- */
+.modbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 22px;
+        border-bottom:1px solid var(--line);background:#0b0b0d}
+.modbar .lead{font-size:11px;color:var(--txt-3);margin-right:2px;white-space:nowrap}
+.modchip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;
+         border-radius:999px;background:var(--card);border:1px solid var(--line);
+         color:var(--txt-2);font-size:12px;cursor:grab;user-select:none;white-space:nowrap;
+         transition:background var(--dur) var(--ease), border-color var(--dur) var(--ease),
+                    color var(--dur) var(--ease), transform .18s var(--ease)}
+.modchip:hover{background:var(--card-2);color:var(--txt)}
+.modchip.on{border-color:var(--up);color:#fff;background:#1a1416}
+.modchip.dragging{opacity:.45;transform:scale(.96);cursor:grabbing}
+.modchip.dropbefore{box-shadow:-3px 0 0 0 var(--up)}
+.modchip.dropafter{box-shadow:3px 0 0 0 var(--up)}
+.modchip .grip{color:var(--txt-3);font-size:11px}
+.modbar .hint{margin-left:auto;font-size:10.5px;color:var(--txt-3);white-space:nowrap}
+
+/* 搜索框（顶栏） */
+.search{display:flex;align-items:center;gap:6px;position:relative}
+.search input{
+  height:30px;width:190px;padding:0 10px;border-radius:var(--r-el);
+  background:var(--card-2);border:1px solid var(--line-2);color:var(--txt);
+  font:12.5px inherit;outline:none;transition:border-color var(--dur) var(--ease), width var(--dur) var(--ease);
+}
+.search input:focus{border-color:var(--blue);width:230px}
+.search input::placeholder{color:var(--txt-3)}
+.searchres{position:absolute;top:36px;left:0;z-index:30;min-width:280px;max-height:340px;
+           overflow-y:auto;background:#141417;border:1px solid var(--line-2);border-radius:10px;
+           box-shadow:var(--shadow);display:none}
+.searchres.show{display:block}
+.searchres .it{padding:8px 12px;font-size:12.5px;cursor:pointer;display:flex;gap:10px;
+                align-items:center;transition:background .16s var(--ease)}
+.searchres .it:hover{background:#1c1c20}
+.searchres .it .c{color:var(--txt-3);font-variant-numeric:tabular-nums}
+.searchres .it .s{margin-left:auto;font-variant-numeric:tabular-nums}
+
+.tag-u{background:#3a1616;color:#ffd6d6}
+.tag-d{background:#0f2f26;color:#c9f3e4}
+.tag-n{background:#1e1e22;color:var(--txt-2)}
+.stance{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:6px;
+        font-size:11px;font-weight:700}
+
+/* 页脚：只留一条**细线**（用户要求"下方只留一个适当的空白"，并建议把数据来源放这儿）。
+   ⚠️ 必须做得很薄：它占的每一像素都是从卡片高度里扣的。
+   所以：单行、11px、上下内边距各 5px、超长用省略号 —— 想看全的可以点开「系统自检」模块，
+   那里有完整的数据来源与免责声明。 */
+.foot{
+  border-top:1px solid var(--line);margin-top:6px;padding:5px 22px 6px;
+  color:var(--txt-3);font-size:11px;line-height:1.5;
+  display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden;
+}
+.foot #sources{overflow:hidden;text-overflow:ellipsis;flex:1 1 auto;min-width:0}
+.foot #disclaimer{flex:none;opacity:.75}
+.state{padding:26px;text-align:center;color:var(--txt-3);font-size:12.5px}
+.state .big{font-size:22px;margin-bottom:8px}
+.err{color:#ffb4b4}
+
+.heatbar{display:block;height:8px;background:#2a2a30;border-radius:2px;overflow:hidden;min-width:60px}
+.heatbar > i{display:block;height:8px;background:var(--up);border-radius:2px;
+             transition:width .35s var(--ease)}
+
+/* ---------------- 横屏 / 竖屏：切换器二选一（用户明确要求） ----------------
+   横屏（宽屏）：三个界面**并排**，用顶部横向模块条换内容
+   竖屏（窄屏）：三个界面**竖着排**，顶部横向条隐藏，改用左侧**竖排**切换按钮
+                （竖排按钮 = 每个界面一个，点一下滚到那个界面）
+   ------------------------------------------------------------------ */
+/* 竖排切换器（默认不显示，只在竖屏出现） */
+.vswitch{display:none;flex-direction:column;gap:6px;position:sticky;top:64px;
+         flex:0 0 auto;width:66px}
+.vswitch .vc{display:flex;flex-direction:column;align-items:center;justify-content:center;
+             gap:2px;padding:8px 4px;border-radius:10px;background:var(--card);
+             border:1px solid var(--line);color:var(--txt-3);cursor:pointer;flex:none;
+             transition:background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease),
+                        border-color var(--dur-fast) var(--ease), transform .18s var(--ease)}
+.vswitch .vc .ic{font-size:13px;line-height:1}
+.vswitch .vc .tx{font-size:10px;line-height:1.1;white-space:nowrap}
+.vswitch .vc:hover{color:var(--txt);background:var(--card-2)}
+.vswitch .vc.on{border-color:var(--up);color:#fff;background:#1a1416}
+.vswitch .vc:active{transform:scale(.94)}
+
+@media (max-width:1079px){
+  /* 竖屏：隐藏顶部横向模块条，显示竖排切换按钮；三个界面竖着排 */
+  .modbar{display:none}
+  .vswitch{display:flex}
+  /* 竖屏：三块**竖着排**（flex 方向改 column），每块最多 86vh 自己上下滚，
+     页面负责在块之间移动 —— 两种滑法都有。 */
+  .stage{flex-direction:column !important;height:auto !important;width:100%}
+  .stage>.mod{width:100% !important;flex:0 0 auto !important;height:auto;max-height:86vh}
+  .gutter,.collapsed{display:none}       /* 竖屏不做左右分栏拖动 */
+}
+@media (min-width:1080px){
+  /* 横屏：显示顶部横向条（三个界面并排），隐藏竖排切换器 */
+  .vswitch{display:none}
+}
+@media (max-width:1079px){
+  .shell{padding:12px 12px 20px;gap:10px}
+  .topbar{padding:12px 14px}
+  .modbar{padding:10px 12px}
+  .modbar .hint{display:none}
+  .search input{width:132px}
+  .search input:focus{width:160px}
+  .notice{margin:10px 12px 0}
+  .foot{padding:14px 14px 22px}
+  .stage>.mod{min-height:0 !important}
+  .mod{padding:14px}
+  .slotpick{height:26px;font-size:12px}
+  /* 手机窄：左侧模块列表收窄成图标+短名，别把内容挤没 */
+  .slotwrap{gap:8px}
+  .picklist{flex:0 0 92px}
+  .picklist .pickitem{padding:7px 6px;font-size:11px;gap:6px}
+  .picklist .pickitem .tx{overflow:hidden;text-overflow:ellipsis}
+  .zoomhead .zoomtitle{font-size:13px}
+  th,td{padding:7px 8px}
+  canvas.kc{height:280px}
+  canvas.kc.tall{height:320px}
+  .grid2{grid-template-columns:1fr}
+  .ktip{font-size:10.5px;min-width:104px}
+}
+
+/* 电脑端（宽度够、高度也够）：**整页不滚动**，滚动都发生在卡片内部。
+   为什么要显式写：加了左右留白与顶部横幅后，文档高度会出现 2~3px 的亚像素溢出，
+   虽然滚动条全局隐藏、肉眼看不出来，但整页会不会滚这个自检指标会变红。
+   限高 700px：屏幕太矮时仍然允许整页滚动，免得内容被裁掉。 */
+@media (min-width:1080px) and (min-height:700px){
+  html,body{overflow:hidden}
+}
+
+/* ---------------- 卡片变窄后，表内密度自动提高（**容器查询**） ----------------
+   用户要求："卡片变长变窄后，里面的表格、文字要自动适应新的比例"。
+
+   为什么用容器查询而不是媒体查询：要判断的是"**这张卡片**有多宽"，
+   而不是"屏幕有多宽" —— 同一个屏幕上，三块并排时每块约 386px，
+   拖成两块 1:2 时其中一块变成 864px，屏幕宽度却没变。
+   `@container` 能让这两块**各自**适配（媒体查询做不到）。
+   这里收窄单元格内边距与字号，让同一屏多看 1~2 列；
+   表格内容不会被截断，仍然可以按住左右拖（.hpan）。 */
+.mod.slot .body{container-type:inline-size}
+@container (max-width: 420px){
+  .body table th, .body table td{padding:5px 6px;font-size:11.5px}
+  .body .kpi{gap:6px}
+  .body .kpi .v{font-size:17px}
+  .body .note{font-size:11.5px}
+}
+
+/* 自检模块里的「口径与数据来源」盒子（用户要求从主界面搬进来） */
+.metabox{
+  margin-top:14px;padding:10px 12px;border-radius:var(--r-el);
+  background:var(--card-2);border:1px solid var(--line);
+}
+.metabox .mb-title{font-size:12px;font-weight:700;color:var(--txt-2);margin-bottom:6px}
+/* 自检模块标签的警示色（失效/空仓预警时不新增元素，只变色） */
+.modchip.warn{border-color:#5c4520;color:#ffd9a8}
+.modchip.danger{border-color:#6d2626;color:#ffd6d6}
+
+/* 规则化点评卡片（个股页） */
+.cmtcard{border-color:#2f2a1c}
+.cmttext{font-size:13.5px;line-height:1.85;color:var(--txt);margin-top:6px}
+.cmtparts{margin-top:10px;display:grid;gap:6px;font-size:12px;color:var(--txt-2);line-height:1.7}
+.cmtparts b{color:var(--txt);margin-right:6px}

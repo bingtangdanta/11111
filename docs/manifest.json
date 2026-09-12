@@ -1,0 +1,20 @@
+{
+  "name": "量化猎人 · A股盘后复盘",
+  "short_name": "量化猎人",
+  "description": "A股盘后复盘：全市场选股评分、板块资金、龙虎榜、机构动态、场外ETF、系统自检与规则化点评。仅供研究，不构成投资建议。",
+  "start_url": "./m.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a0b",
+  "theme_color": "#0a0a0b",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

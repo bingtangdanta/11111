@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>量化猎人 · A股盘后复盘</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" href="icon.svg">
+</head>
+<body>
+
+<!-- 顶部状态栏：搜索 + 交易日 / 数据档位 / 生成时间 / 刷新 -->
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">▲</span>
+    <div>
+      <h1>量化猎人</h1>
+      <p class="sub">A股盘后复盘 · 数据每天 16:00 / 18:00 / 20:00 自动更新，盘中不刷新</p>
+    </div>
+  </div>
+  <div class="status" id="status">
+    <div class="search">
+      <input id="searchInput" type="search" autocomplete="off" spellcheck="false"
+             placeholder="搜索股票：代码或名称（600519 / 茅台）">
+      <div class="searchres" id="searchRes"></div>
+    </div>
+    <span class="badge b-blue" id="badgeDate">—</span>
+    <span class="badge b-amber" id="badgeSlot">—</span>
+    <span class="muted" id="stamp">加载中…</span>
+    <span class="muted" id="snapTip" style="display:none"></span>
+    <button class="btn btn-primary" id="refreshBtn" title="重新拉取最新已发布数据">刷新数据</button>
+  </div>
+</header>
+
+<!-- 顶部模块条：所有模块都列出来。点一下放进"当前界面"；拖到某一列直接替换那个界面 -->
+<div class="modbar" id="modbar"></div>
+
+<!-- 主界面到此为止：只有「搜索 / 交易日 / 档位 / 生成时间 / 刷新」+ 模块条 + 三个界面。
+     用户要求（原话）："把数据来源去掉，数据来源不用显示在主第一界面……
+     自检的蓝框提示放在系统自检里，口径提示也跟数据来源放在一块儿，不要放在主界面"。
+     所以下面这些**都搬进了「系统自检」模块里**（见 app.js 的 fillSelfcheck）：
+       · 自检横幅（原 #sysWarn）
+       · 口径提示（原 #notice）
+       · 数据来源 / 免责声明（原 <footer>）
+     这样主界面干净，而"这些数字是怎么来的"仍然随时可查（就在自检模块底部）。 -->
+
+<main class="shell" id="shell">
+  <!-- 竖屏用的**竖排切换按钮**（横屏时被 CSS 隐藏，改用顶部横向条） -->
+  <aside class="vswitch" id="vswitch" aria-label="竖排切换"></aside>
+  <!-- 页面固定就是**三个界面**：横屏三列并排 / 竖屏三块竖排；每个界面顶部有下拉可换内容 -->
+  <section class="stage" id="stage"></section>
+</main>
+
+<!-- 页脚：只留一条细线（用户要求"下方留一个适当的空白"，并建议把数据来源放这儿）。
+     做成一行 11px，占的高度几乎可以忽略；完整版（口径提示 + 缺失项）在「系统自检」模块里。 -->
+<footer class="foot" id="foot">
+  <span id="sources">数据来源加载中…</span>
+  <span id="disclaimer"></span>
+</footer>
+
+<script>
+/* 注册 Service Worker：手机端弱网/离线也能打开，重复打开时一个请求都不发。
+   ⚠️ 只在 https 或 localhost 下生效（GitHub Pages / Cloudflare Pages 都是 https）；
+      本地用 file:// 打开不会注册，也不影响页面功能。 */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => { /* 注册失败不影响使用 */ });
+  });
+}
+</script>
+<script src="app.js"></script>
+</body>
+</html>

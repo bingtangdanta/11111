@@ -1,0 +1,167 @@
+/* m.css — 手机版草稿：纯黑极简金融风。无渐变、无光影（照你最早说的那版要求）。
+   设计要点：
+     · 单列、一次只显示一个标签页；底部五个标签，红色激活
+     · 触摸目标 ≥44px；适配 iPhone 刘海与底部横条（safe-area）
+     · 红涨绿跌；数字一律等宽对齐
+     · 页面只整体滚动，列表不嵌套滚动（手机上嵌套滚动最容易卡）
+*/
+:root{
+  --bg:#0b0b0d; --card:#141417; --card2:#1b1b20; --line:#232329; --line2:#33333b;
+  --txt:#ececf1; --txt2:#a6a6b0; --txt3:#6f6f7a;
+  --up:#e64545; --down:#20a67a; --blue:#3d7dff; --amber:#e8a33d; --purple:#a06ee8;
+  --bar:56px; --tab:58px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+  font:15px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+body{padding-bottom:calc(var(--tab) + 52px + env(safe-area-inset-bottom))}
+b{font-weight:700}
+.up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--txt2)} .muted{color:var(--txt3)}
+/* 「快评分」不是精算分：**必须比精算分弱一档**，不能让两列分数看起来一样权威 */
+.dim{color:var(--txt3);font-weight:600}
+.num{font-variant-numeric:tabular-nums}
+
+/* 顶部栏 */
+.appbar{
+  position:sticky;top:0;z-index:20;height:var(--bar);
+  display:flex;align-items:center;gap:10px;padding:0 14px;
+  padding-top:env(safe-area-inset-top);
+  background:var(--bg);border-bottom:1px solid var(--line);
+}
+.ab-l{display:flex;flex-direction:column;min-width:0;flex:1}
+.ab-l b{font-size:16px;line-height:1.2}
+.ab-l span{font-size:11.5px;color:var(--txt3)}
+.ab-r{display:flex;align-items:center;gap:6px;flex:none}
+.iconbtn{
+  width:42px;height:42px;border-radius:12px;border:1px solid var(--line);
+  background:var(--card);color:var(--txt);font-size:17px;line-height:1;
+}
+.iconbtn:active{background:var(--card2);transform:scale(.96)}
+.price{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* 内容区 */
+.view{padding:12px 12px 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:10px}
+.card h3{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--txt)}
+.card h3 .sub{font-weight:400;color:var(--txt3);font-size:11px;margin-left:6px}
+
+/* 大数字组 */
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpis .k{font-size:11px;color:var(--txt3)}
+.kpis .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.25}
+.kpis>div{min-width:0}
+.big{font-size:34px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+
+/* 行列表（手机主要形态） */
+.rows{display:flex;flex-direction:column}
+.row{
+  display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 2px;
+  border-top:1px solid var(--line);
+}
+.rows .row:first-child{border-top:none}
+.row .nm{flex:1;min-width:0}
+.row .nm b{display:block;font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.row .nm span{font-size:11.5px;color:var(--txt3)}
+.row .rt{text-align:right;flex:none;font-variant-numeric:tabular-nums}
+.row .rt b{display:block;font-size:15px;font-weight:700}
+.row .rt span{font-size:11.5px;color:var(--txt3)}
+.row:active{background:var(--card2)}
+.idx{width:20px;flex:none;text-align:center;color:var(--txt3);font-size:12px}
+.idx.top{color:var(--up);font-weight:700}
+
+/* 分段控件（行业/概念、涨停/炸板/跌停…） */
+.seg{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.seg button{
+  flex:none;height:34px;padding:0 13px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card);color:var(--txt2);font-size:13px;
+}
+.seg button.on{border-color:var(--up);color:#fff;background:#1d1416}
+
+/* 标签（倾向、连板数） */
+.tag{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:6px;font-size:11px;font-weight:700}
+.tag.up{background:#3a1616;color:#ffd6d6}
+.tag.down{background:#0f2f26;color:#c9f3e4}
+.tag.flat{background:#1e1e22;color:var(--txt2)}
+.tag.lb{background:#2a1a12;color:#ffd9b0}
+.tag.blue{background:#141c33;color:#cfe0ff}
+
+/* 迷你图 */
+.chartbox{margin-top:6px}
+canvas{width:100%;display:block;border-radius:10px;background:#101013}
+
+/* 筹码条（蓝=现价以上套牢，红=现价以下获利；黄线=现价，紫线=平均筹码） */
+.chips{display:flex;flex-direction:column;gap:1px;margin-top:10px}
+.chips .cr{display:flex;align-items:center;gap:6px;height:6px}
+.chips .cr i{display:block;height:4px;border-radius:1px}
+.chips .cr .p{width:44px;flex:none;text-align:right;font-size:0} /* 手机版不显示每行价格，省空间 */
+
+/* 龙头股小标签 */
+.leads{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+.leads button{
+  height:32px;padding:0 10px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card2);color:var(--txt2);font-size:12px;
+}
+.leads button b{color:var(--txt)}
+
+/* 详情页（全屏盖上来） */
+.sheet{
+  position:fixed;inset:0;z-index:40;background:var(--bg);
+  transform:translateX(100%);transition:transform .26s cubic-bezier(.22,1,.36,1);
+  display:flex;flex-direction:column;
+}
+.sheet.on{transform:none}
+.sheetbar{padding-left:6px}
+.sheetbody{flex:1;overflow-y:auto;padding:12px 12px 30px}
+.kv{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:9px 0;border-top:1px solid var(--line);font-size:13.5px}
+.kv:first-child{border-top:none}
+.kv .k{color:var(--txt3)}
+.kv .v{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--card2);
+      color:var(--txt2);font-size:11.5px;margin:0 6px 6px 0}
+
+/* 搜索浮层 */
+.searchlay{
+  position:fixed;inset:0;z-index:50;background:#0b0b0dee;display:none;
+  padding:calc(env(safe-area-inset-top) + 10px) 12px 12px;
+}
+.searchlay.on{display:block}
+.searchbox{display:flex;gap:8px}
+.searchbox input{
+  flex:1;height:46px;border-radius:12px;border:1px solid var(--line2);
+  background:var(--card);color:var(--txt);font-size:15px;padding:0 12px;outline:none;
+}
+.btn{height:46px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);
+     background:var(--card);color:var(--txt);font-size:14px}
+.searchres{margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;
+           overflow:hidden}
+
+/* 底部标签栏 */
+.tabbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;height:calc(var(--tab) + env(safe-area-inset-bottom));
+  padding-bottom:env(safe-area-inset-bottom);
+  /* 7 个标签：用 auto-fit 而不是写死 repeat(5,1fr) ——
+     写死列数时每加一个标签都要回来改 CSS，忘了就换行/挤成一团。 */
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));
+  background:#0e0e11;border-top:1px solid var(--line);
+}
+.tab{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  border:none;background:none;color:var(--txt3);font-size:11px;
+  min-width:0;padding:0 2px;
+}
+.tab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.tab i{font-size:17px;font-style:normal;line-height:1}
+.tab.on{color:var(--up)}
+.tab.on i{color:var(--up)}
+
+/* 底部说明（跟标签栏错开，避免被挡） */
+.foot{position:fixed;left:0;right:0;bottom:calc(var(--tab) + env(safe-area-inset-bottom));
+      padding:6px 14px;font-size:10.5px;color:var(--txt3);background:var(--bg);
+      border-top:1px solid var(--line);display:none}
+
+.state{padding:26px 10px;text-align:center;color:var(--txt3);font-size:13px}
+.err{color:#ffb4b4}
+.spin{display:inline-block;animation:sp .8s linear infinite}
+@keyframes sp{from{transform:rotate(0)}to{transform:rotate(360deg)}}

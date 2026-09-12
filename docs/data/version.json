@@ -1,0 +1,16 @@
+{
+  "trade_date": null,
+  "generated_at": null,
+  "slot": "尚未生成",
+  "slots": [
+    "16:00",
+    "18:00",
+    "20:00"
+  ],
+  "scored": 0,
+  "top": [],
+  "placeholder": true,
+  "sources": [],
+  "missing": {},
+  "disclaimer": "数据尚未生成：请在 GitHub Actions 里手动运行一次 update-data。"
+}

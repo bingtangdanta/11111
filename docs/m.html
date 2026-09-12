@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#0b0b0d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>量化猎人 · 手机版（草稿）</title>
+<link rel="stylesheet" href="m.css">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" href="icon.svg">
+</head>
+<body>
+
+<!-- 顶部：标题 + 交易日 + 刷新 -->
+<header class="appbar">
+  <div class="ab-l">
+    <b id="abTitle">复盘看板</b>
+    <span id="abSub">加载中…</span>
+  </div>
+  <div class="ab-r">
+    <button class="iconbtn" id="btnSearch" aria-label="搜索">🔍</button>
+    <button class="iconbtn" id="btnRefresh" aria-label="刷新">⟳</button>
+  </div>
+</header>
+
+<!-- 搜索浮层 -->
+<div class="searchlay" id="searchLay">
+  <div class="searchbox">
+    <input id="q" type="search" placeholder="输入代码或名称，如 600519 / 茅台" autocomplete="off">
+    <button class="btn ghost" id="qCancel">取消</button>
+  </div>
+  <div class="searchres" id="qRes"></div>
+</div>
+
+<!-- 内容：一次只显示一个标签页 -->
+<main id="view" class="view"></main>
+
+<!-- 个股详情：全屏盖上来（手机上就是"点进去 / 退回来"） -->
+<section class="sheet" id="sheet" aria-hidden="true">
+  <header class="appbar sheetbar">
+    <button class="iconbtn" id="sheetBack" aria-label="返回">‹</button>
+    <div class="ab-l"><b id="shName">—</b><span id="shCode">—</span></div>
+    <div class="ab-r"><span id="shPrice" class="price">—</span></div>
+  </header>
+  <div class="sheetbody" id="sheetBody"></div>
+</section>
+
+<!-- 底部七个标签（一轮只渲染一个标签页的 DOM） -->
+<nav class="tabbar" id="tabbar">
+  <button class="tab on" data-tab="board"><i>▦</i><span>看板</span></button>
+  <button class="tab" data-tab="limitup"><i>▲</i><span>涨停</span></button>
+  <button class="tab" data-tab="screen"><i>▽</i><span>选股</span></button>
+  <button class="tab" data-tab="sectors"><i>◍</i><span>板块</span></button>
+  <button class="tab" data-tab="funds"><i>◎</i><span>场外</span></button>
+  <button class="tab" data-tab="review"><i>✓</i><span>股评</span></button>
+  <button class="tab" data-tab="research"><i>◈</i><span>机构</span></button>
+</nav>
+
+<footer class="foot">
+  <span id="footNote">数据来源：东方财富免费接口 · 每日 16/18/20 点自动更新。仅供研究，不构成投资建议。</span>
+</footer>
+
+<script>
+/* 注册 Service Worker：手机端弱网/离线也能打开，重复打开时一个请求都不发。
+   ⚠️ 只在 https 或 localhost 下生效（GitHub Pages / Cloudflare Pages 都是 https）；
+      本地用 file:// 打开不会注册，也不影响页面功能。 */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => { /* 注册失败不影响使用 */ });
+  });
+}
+</script>
+<script src="m.js"></script>
+</body>
+</html>
