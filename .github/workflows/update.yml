@@ -1,0 +1,39 @@
+name: Update Data
+
+on:
+  schedule:
+    - cron: '0 8,10,12 * * 1-5' # 对应北京时间 16:00, 18:00, 20:00
+  workflow_dispatch: # 允许手动点击触发
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run update script
+        env:
+          HITHINK_FINANCE_API_KEY: ${{ secrets.HITHINK_FINANCE_API_KEY }}
+        run: |
+          python scripts/regime.py
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/data/
+          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-update data"
+          git push
